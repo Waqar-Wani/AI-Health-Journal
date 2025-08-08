@@ -1,13 +1,14 @@
 import axios from 'axios';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+  baseURL: isProd ? '/api' : (process.env.REACT_APP_API_URL || 'http://localhost:5000/api'),
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -16,18 +17,13 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }

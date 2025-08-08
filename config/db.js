@@ -1,34 +1,39 @@
 const mongoose = require('mongoose');
 
+let cached = global.mongooseConnection;
+if (!cached) {
+  cached = global.mongooseConnection = { conn: null, promise: null };
+}
+
 const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-
-    // Handle connection events
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('MongoDB disconnected');
-    });
-
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      await mongoose.connection.close();
-      console.log('MongoDB connection closed through app termination');
-      process.exit(0);
-    });
-
-  } catch (error) {
-    console.error('Database connection error:', error);
-    process.exit(1);
+  if (cached.conn) {
+    return cached.conn;
   }
+
+  if (!cached.promise) {
+    const uri = process.env.MONGODB_URI;
+    cached.promise = mongoose
+      .connect(uri, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      })
+      .then((mongooseInstance) => {
+        // Events
+        mongoose.connection.on('error', (err) => {
+          console.error('MongoDB connection error:', err);
+        });
+        mongoose.connection.on('disconnected', () => {
+          console.log('MongoDB disconnected');
+        });
+        return mongooseInstance;
+      })
+      .catch((err) => {
+        console.error('Database connection error:', err);
+        throw err;
+      });
+  }
+  cached.conn = await cached.promise;
+  return cached.conn;
 };
 
 module.exports = connectDB;
